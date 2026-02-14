@@ -1,0 +1,22 @@
+{
+  "name": "@openclaw/skill-approval",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "OpenClaw skill approval plugin - intercepts skill installations and requires admin approval",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "scripts": {
+    "test": "vitest"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.1.26"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "openclaw": "workspace:*",
+    "vitest": "^1.2.0"
+  }
+}
