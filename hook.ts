@@ -43,18 +43,31 @@ const EXEC_TOOLS = new Set([
 
 // 技能安装关键词模式（匹配 shell 命令内容）
 const SKILL_INSTALL_PATTERNS: RegExp[] = [
+  // --- CLI 安装命令 ---
   /\bclawhub\s+install\b/i,
   /\bclawhub\s+add\b/i,
   /\bnpx\s+skills?\s+add\b/i,
   /\bopenclaw\s+skills?\s+install\b/i,
   /\binstall\.sh\b/i,
+
+  // --- git / curl / wget 安装 ---
   /\bgit\s+clone\b.*\bskills?\b/i,
   /\bskills?\b.*\bgit\s+clone\b/i,
   /\bcurl\b.*\bskills?\b.*\binstall\b/i,
   /\bwget\b.*\bskills?\b.*\binstall\b/i,
-  // 向 skills 目录写入文件
-  /[~\/]\.openclaw\/skills\//i,
-  /\/skills\/.*SKILL\.md/i,
+
+  // --- 向 skills 固定目录写入（绝对路径 + 通用路径） ---
+  /\.openclaw\/skills\//i,                      // 通用匹配 ~/.openclaw/skills/
+  /\/Users\/[^/]+\/\.openclaw\/skills\//i,      // macOS 绝对路径
+  /\/home\/[^/]+\/\.openclaw\/skills\//i,       // Linux 绝对路径
+  /\/skills\/.*SKILL\.md/i,                     // SKILL.md 是技能清单文件
+
+  // --- 向 plugins 目录写入（防止绕过插件审批） ---
+  /\.openclaw\/plugins\//i,
+  /\.openclaw\/extensions\//i,
+
+  // --- 保护核心配置文件（防止 Agent 篡改） ---
+  /\.openclaw\/openclaw\.json/i,
 ];
 
 /**

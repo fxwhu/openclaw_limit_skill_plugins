@@ -208,6 +208,29 @@ describe('Skill Approval Plugin', () => {
       expect(isSkillInstallCommand('cp -r /tmp/skill ~/.openclaw/skills/new')).toBe(true);
     });
 
+    it('拦截绝对路径写入 skills 目录', async () => {
+      const { isSkillInstallCommand } = await import('../hook.ts');
+
+      // macOS 绝对路径
+      expect(isSkillInstallCommand('cp -r /tmp/skill /Users/fengxuan/.openclaw/skills/new-skill')).toBe(true);
+      // Linux 绝对路径
+      expect(isSkillInstallCommand('cp -r /tmp/skill /home/user/.openclaw/skills/new-skill')).toBe(true);
+    });
+
+    it('拦截写入 plugins/extensions 目录', async () => {
+      const { isSkillInstallCommand } = await import('../hook.ts');
+
+      expect(isSkillInstallCommand('cp plugin.js ~/.openclaw/plugins/my-plugin/')).toBe(true);
+      expect(isSkillInstallCommand('cp ext.js ~/.openclaw/extensions/my-ext/')).toBe(true);
+    });
+
+    it('拦截修改 openclaw.json', async () => {
+      const { isSkillInstallCommand } = await import('../hook.ts');
+
+      expect(isSkillInstallCommand('echo "{}" > ~/.openclaw/openclaw.json')).toBe(true);
+      expect(isSkillInstallCommand('sed -i "s/foo/bar/" /Users/fengxuan/.openclaw/openclaw.json')).toBe(true);
+    });
+
     it('普通命令不误判', async () => {
       const { isSkillInstallCommand } = await import('../hook.ts');
 
