@@ -1,84 +1,115 @@
-# OpenClaw 技能安装审批插件
+# OpenClaw Skill Approval Plugin
 
-拦截 Agent 的 `installSkill` 调用，在聊天中提示「需要审批」，由管理员通过 `/approve` 命令放行后才能安装。
+An OpenClaw plugin that intercepts skill installation attempts, requiring admin approval before execution.
 
-## 工作流程
+## How it Works
 
 ```
-Agent 尝试安装技能
+Agent tries to install a skill (via exec / installSkill / clawhub install)
     ↓
-Hook 拦截，在聊天中显示：
+Hook intercepts → shows approval prompt in chat:
     ⚠️ 需要审批
-    技能地址: https://...
+    检测到技能安装命令: clawhub install xxx
     请求 ID: abc123
     ↓
-聊天中的人口头告知管理员
+Admin runs /approve abc123 in chat
     ↓
-管理员在聊天中执行 /approve abc123
-    ↓
-Agent 重新安装 → ✅ 放行
+Agent retries → ✅ Approved, installation proceeds
 ```
 
-## 技术方案
+## Interception Strategy
 
-### 核心架构
+The plugin uses a **multi-layer interception** approach:
 
+| Layer       | Target                                            | Detection                        |
+| ----------- | ------------------------------------------------- | -------------------------------- |
+| Direct tool | `installSkill`, `install_skill`, `skills_install` | Tool name match                  |
+| Exec tool   | `exec`, `system.run`, `bash`, `shell`, etc.       | Command content keyword matching |
+
+### Intercepted Command Patterns
+
+Commands matching any of these patterns will trigger approval:
+
+- `clawhub install / add`
+- `npx skills add`
+- `openclaw skills install`
+- `install.sh`
+- `git clone ...skills...`
+- `curl / wget` + skills + install
+- Writing to `~/.openclaw/skills/` directory
+
+### Bypass (No Interception)
+
+- Normal shell commands (`ls`, `npm install`, `cat`, etc.)
+- `git clone` without "skills" keyword
+- Already approved commands
+
+## Installation
+
+### Option 1: Load Path (Recommended)
+
+Add the plugin path to `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "plugins": {
+    "load": {
+      "paths": ["/path/to/openclaw_limit_skill_plugins"]
+    },
+    "entries": {
+      "skill-approval": {
+        "enabled": true,
+        "config": {
+          "adminUsers": ["your_user_id"]
+        }
+      }
+    }
+  }
+}
 ```
-openclaw.plugin.json    ← Loader 发现插件的 manifest（必须含 configSchema）
-        ↓
-index.ts (register)     ← 注册 Hook + 命令 + 加载白名单配置
-        ↓
-hook.ts                 ← before_tool_call 拦截 installSkill
-        ↓
-store.ts                ← 内存审批状态（pending → approved/rejected）
-```
 
-### 关键设计
-
-| 要点         | 说明                                                                                               |
-| ------------ | -------------------------------------------------------------------------------------------------- |
-| **拦截方式** | `api.registerHook('before_tool_call', handler, { name })` — opts.name 必填，否则 registry 静默跳过 |
-| **通知方式** | Hook 返回 `blockReason`，Agent 将其呈现在当前聊天中                                                |
-| **审批方式** | 管理员在聊天中发送 `/approve <id>` 命令                                                            |
-| **权限控制** | `pluginConfig.adminUsers` 白名单，未配置时所有人可审批                                             |
-| **状态存储** | 进程内存（重启后清空），可扩展为文件持久化                                                         |
-| **幂等性**   | 同一 URL 重复请求会复用已有 pending 记录                                                           |
-
-## 安装
+### Option 2: Copy to Extensions
 
 ```bash
-./install.sh /path/to/openclaw/extensions
+./install.sh ~/.openclaw/extensions
 ```
 
-## 配置管理员白名单
+## Configuration
 
-在 OpenClaw 配置中为本插件设置管理员列表：
+| Field        | Type       | Default | Description                                                                                      |
+| ------------ | ---------- | ------- | ------------------------------------------------------------------------------------------------ |
+| `adminUsers` | `string[]` | `[]`    | Admin allowlist. Only listed users can run `/approve` and `/deny`. Empty = everyone can approve. |
 
-```yaml
-# openclaw 配置文件中
-plugins:
-  skill-approval:
-    adminUsers:
-      - "admin_user_id_1"
-      - "admin_user_id_2"
+## Commands
+
+| Command           | Permission | Description                     |
+| ----------------- | ---------- | ------------------------------- |
+| `/approve <id>`   | Admin      | Approve a skill install request |
+| `/deny <id>`      | Admin      | Reject a skill install request  |
+| `/list-approvals` | Everyone   | List pending approval requests  |
+
+## Architecture
+
+```
+openclaw.plugin.json    ← Plugin manifest + configSchema
+        ↓
+index.ts (register)     ← Register hooks, commands, load admin config
+        ↓
+hook.ts                 ← Multi-layer intercept (installSkill + exec commands)
+        ↓
+store.ts                ← In-memory approval state (pending → approved/rejected)
 ```
 
-未配置 `adminUsers` 时，所有用户均可执行审批命令。
+## Files
 
-## 命令
+| File                   | Purpose                                                |
+| ---------------------- | ------------------------------------------------------ |
+| `openclaw.plugin.json` | Plugin manifest with adminUsers config schema          |
+| `index.ts`             | Entry: register hooks/commands, admin allowlist        |
+| `hook.ts`              | Intercept logic: direct tools + exec command detection |
+| `store.ts`             | Approval state: pending queue + approved set           |
+| `install.sh`           | One-click install script                               |
 
-| 命令              | 权限   | 说明           |
-| ----------------- | ------ | -------------- |
-| `/approve <id>`   | 管理员 | 批准安装请求   |
-| `/deny <id>`      | 管理员 | 拒绝安装请求   |
-| `/list-approvals` | 所有人 | 查看待审批列表 |
+## License
 
-## 文件说明
-
-| 文件                   | 职责                                            |
-| ---------------------- | ----------------------------------------------- |
-| `openclaw.plugin.json` | 插件 manifest + adminUsers 配置声明             |
-| `index.ts`             | 入口：注册 Hook/命令、加载白名单、权限校验      |
-| `hook.ts`              | 拦截逻辑：仅拦截 installSkill，返回中文审批提示 |
-| `store.ts`             | 审批状态管理：待审批队列 + 已批准集合           |
-| `install.sh`           | 一键安装脚本                                    |
+MIT
