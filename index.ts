@@ -1,6 +1,5 @@
 
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
-import { emptyPluginConfigSchema } from "openclaw/plugin-sdk";
 import { onBeforeToolCall } from './hook.js';
 import { approvalStore } from './store.js';
 
@@ -19,7 +18,18 @@ const skillApprovalPlugin = {
     name: 'Skill Approval Plugin',
     description: '拦截技能安装请求，需要管理员审批后才能执行安装。',
     version: '1.0.0',
-    configSchema: emptyPluginConfigSchema(),
+    configSchema: {
+        type: 'object' as const,
+        additionalProperties: false,
+        properties: {
+            adminUsers: {
+                type: 'array' as const,
+                items: { type: 'string' as const },
+                description: '管理员白名单，只有列表中的用户可以执行 /approve 和 /deny 命令',
+                default: [],
+            },
+        },
+    },
     register(api: OpenClawPluginApi) {
         // 加载管理员白名单配置
         const pluginConfig = api.pluginConfig as { adminUsers?: string[] } | undefined;
