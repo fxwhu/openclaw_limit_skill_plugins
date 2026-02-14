@@ -1,34 +1,34 @@
-# OpenClaw Skill Approval Plugin
+# OpenClaw 技能安装审批插件
 
-An OpenClaw plugin that intercepts skill installation attempts, requiring admin approval before execution.
+拦截 Agent 的技能安装操作，需要管理员审批后才能执行。
 
-## How it Works
+## 工作流程
 
 ```
-Agent tries to install a skill (via exec / installSkill / clawhub install)
+Agent 尝试安装技能（exec / installSkill / clawhub install）
     ↓
-Hook intercepts → shows approval prompt in chat:
+Hook 拦截，在聊天中显示：
     ⚠️ 需要审批
     检测到技能安装命令: clawhub install xxx
     请求 ID: abc123
     ↓
-Admin runs /approve abc123 in chat
+管理员在聊天中执行 /approve abc123
     ↓
-Agent retries → ✅ Approved, installation proceeds
+Agent 重新执行 → ✅ 放行，安装成功
 ```
 
-## Interception Strategy
+## 拦截策略
 
-The plugin uses a **multi-layer interception** approach:
+插件采用**多层拦截**机制：
 
-| Layer       | Target                                            | Detection                        |
-| ----------- | ------------------------------------------------- | -------------------------------- |
-| Direct tool | `installSkill`, `install_skill`, `skills_install` | Tool name match                  |
-| Exec tool   | `exec`, `system.run`, `bash`, `shell`, etc.       | Command content keyword matching |
+| 拦截层   | 目标工具                                          | 检测方式       |
+| -------- | ------------------------------------------------- | -------------- |
+| 直接拦截 | `installSkill`、`install_skill`、`skills_install` | 工具名匹配     |
+| 命令拦截 | `exec`、`system.run`、`bash`、`shell` 等          | 命令内容关键词 |
 
-### Intercepted Command Patterns
+### 会被拦截的命令
 
-Commands matching any of these patterns will trigger approval:
+匹配以下任意模式的命令会触发审批：
 
 - `clawhub install / add`
 - `npx skills add`
@@ -36,19 +36,19 @@ Commands matching any of these patterns will trigger approval:
 - `install.sh`
 - `git clone ...skills...`
 - `curl / wget` + skills + install
-- Writing to `~/.openclaw/skills/` directory
+- 写入 `~/.openclaw/skills/` 目录的操作
 
-### Bypass (No Interception)
+### 不会被拦截的命令
 
-- Normal shell commands (`ls`, `npm install`, `cat`, etc.)
-- `git clone` without "skills" keyword
-- Already approved commands
+- 普通 shell 命令（`ls`、`npm install`、`cat` 等）
+- 不含 "skills" 关键词的 `git clone`
+- 已经审批通过的命令
 
-## Installation
+## 安装
 
-### Option 1: Load Path (Recommended)
+### 方式一：配置加载路径（推荐）
 
-Add the plugin path to `~/.openclaw/openclaw.json`:
+在 `~/.openclaw/openclaw.json` 中添加：
 
 ```json
 {
@@ -60,7 +60,7 @@ Add the plugin path to `~/.openclaw/openclaw.json`:
       "skill-approval": {
         "enabled": true,
         "config": {
-          "adminUsers": ["your_user_id"]
+          "adminUsers": ["你的用户ID"]
         }
       }
     }
@@ -68,48 +68,48 @@ Add the plugin path to `~/.openclaw/openclaw.json`:
 }
 ```
 
-### Option 2: Copy to Extensions
+### 方式二：复制到扩展目录
 
 ```bash
 ./install.sh ~/.openclaw/extensions
 ```
 
-## Configuration
+## 配置项
 
-| Field        | Type       | Default | Description                                                                                      |
-| ------------ | ---------- | ------- | ------------------------------------------------------------------------------------------------ |
-| `adminUsers` | `string[]` | `[]`    | Admin allowlist. Only listed users can run `/approve` and `/deny`. Empty = everyone can approve. |
+| 字段         | 类型       | 默认值 | 说明                                                               |
+| ------------ | ---------- | ------ | ------------------------------------------------------------------ |
+| `adminUsers` | `string[]` | `[]`   | 管理员白名单。只有列表中的用户可执行审批命令。为空时所有人可审批。 |
 
-## Commands
+## 命令
 
-| Command           | Permission | Description                     |
-| ----------------- | ---------- | ------------------------------- |
-| `/approve <id>`   | Admin      | Approve a skill install request |
-| `/deny <id>`      | Admin      | Reject a skill install request  |
-| `/list-approvals` | Everyone   | List pending approval requests  |
+| 命令              | 权限   | 说明           |
+| ----------------- | ------ | -------------- |
+| `/approve <id>`   | 管理员 | 批准安装请求   |
+| `/deny <id>`      | 管理员 | 拒绝安装请求   |
+| `/list-approvals` | 所有人 | 查看待审批列表 |
 
-## Architecture
+## 架构
 
 ```
-openclaw.plugin.json    ← Plugin manifest + configSchema
+openclaw.plugin.json    ← 插件清单 + 配置声明
         ↓
-index.ts (register)     ← Register hooks, commands, load admin config
+index.ts (register)     ← 注册 Hook、命令、加载管理员白名单
         ↓
-hook.ts                 ← Multi-layer intercept (installSkill + exec commands)
+hook.ts                 ← 多层拦截逻辑（直接工具 + exec 命令检测）
         ↓
-store.ts                ← In-memory approval state (pending → approved/rejected)
+store.ts                ← 内存审批状态（pending → approved / rejected）
 ```
 
-## Files
+## 文件说明
 
-| File                   | Purpose                                                |
-| ---------------------- | ------------------------------------------------------ |
-| `openclaw.plugin.json` | Plugin manifest with adminUsers config schema          |
-| `index.ts`             | Entry: register hooks/commands, admin allowlist        |
-| `hook.ts`              | Intercept logic: direct tools + exec command detection |
-| `store.ts`             | Approval state: pending queue + approved set           |
-| `install.sh`           | One-click install script                               |
+| 文件                   | 职责                                     |
+| ---------------------- | ---------------------------------------- |
+| `openclaw.plugin.json` | 插件 manifest + adminUsers 配置声明      |
+| `index.ts`             | 入口：注册 Hook/命令、管理员白名单       |
+| `hook.ts`              | 拦截逻辑：直接工具 + exec 命令关键词检测 |
+| `store.ts`             | 审批状态管理：待审批队列 + 已批准集合    |
+| `install.sh`           | 一键安装脚本                             |
 
-## License
+## 许可证
 
 MIT
